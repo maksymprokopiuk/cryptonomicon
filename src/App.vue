@@ -50,8 +50,10 @@
         <div
           v-for="t in tickers"
           :key="t.name"
-          @click="sel = t"
-          
+          @click="select(t)"
+          :class="{
+            'border-4': sel === t
+          }"
           class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
         >
           <div class="px-4 py-5 sm:p-6 text-center">
@@ -64,7 +66,7 @@
           </div>
           <div class="w-full border-t border-gray-200"></div>
           <button
-            @click="deleteTicker(t)"
+            @click.stop="deleteTicker(t)"
             class="flex items-center justify-center font-medium w-full bg-gray-100 px-4 py-4 sm:px-6 text-md text-gray-500 hover:text-gray-600 hover:bg-gray-200 hover:opacity-20 transition-all focus:outline-none"
           >
             <svg
@@ -86,20 +88,14 @@
     </template>
     <section v-if="sel" class="relative">
       <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
-        VUE - USD
+        {{sel.name}} - USD
       </h3>
       <div class="flex items-end border-gray-600 border-b border-l h-64">
         <div
-          class="bg-purple-800 border w-10 h-5"
-        ></div>
-        <div
-          class="bg-purple-800 border w-10 h-32"
-        ></div>
-        <div
-          class="bg-purple-800 border w-10 h-48"
-        ></div>
-        <div
-          class="bg-purple-800 border w-10 h-64"
+          v-for="(bar, indx) in normalizeGraph()"
+          :key="indx"
+          :style="{ height: `${bar}%`} "
+          class="bg-purple-800 border w-10"
         ></div>
       </div>
       <button
@@ -143,24 +139,49 @@ export default {
       ticker: null,
       tickers: [],
       sel: null,
+      graph: [],
     }
   },
 
   methods: {
     add() {
       if (this.ticker) {
-        const addNewTicker = {
+        const currentTicker = {
           name: this.ticker,
           price: '-'
         }
-        this.tickers.push(addNewTicker)
+        this.tickers.push(currentTicker)
+
+        setInterval(async() => {
+          const f = await fetch(`https://min-api.cryptocompare.com/data/price?fsym=${currentTicker.name}&tsyms=USD&api_key=fd23b0f5bfc39731e5ecc688b5cd67b5f90cfd8ff60c3d03ffdee7ebfe261295`)
+          const data = await f.json()
+
+          this.tickers.find(t => t.name === currentTicker.name).price = data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2) //! для реактивності треба змінну використовувати напр. в data()
+          if (this.sel?.name === currentTicker.name) {
+            this.graph.push(data.USD)
+          }
+        }, 5000);
+
         this.ticker = ''
       }
+    },
+
+    select(ticker) {
+      this.sel = ticker
+      this.graph = []
     },
 
     deleteTicker(deleteItem) {
       this.tickers = this.tickers.filter(t => t !== deleteItem)
     },
+
+    normalizeGraph() {
+      const maxValue = Math.max(...this.graph)
+      const minValue = Math.min(...this.graph)
+      return this.graph.map(
+        price => 5 + ((price - minValue) * 95) / (maxValue - minValue)
+      )
+    }
   },
 };
 </script>
